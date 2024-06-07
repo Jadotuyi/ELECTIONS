@@ -1,123 +1,130 @@
 const express = require('express');
-const mysql = require('mysql2/promise');
+const bodyParser = require('body-parser');
+const mysql = require('mysql');
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+const PORT = process.env.PORT || 3000;
 
-// Create a pool of database connections
-const pool = mysql.createPool({
-    host: 'bmbbgh2kkgtsluvxgsgg-mysql.services.clever-cloud.com',
-    user: 'ukfxzd7xalsto9w1',
-    password: 'Izp4BXbvKMzJQM3URrRD',
-    database: 'bmbbgh2kkgtsluvxgsgg',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// Create a connection to the MySQL database
+const db = mysql.createConnection({
+    host: 'bkd9cyjknzoixcjzu6tx-mysql.services.clever-cloud.com',
+    user: 'ufozwldzwn5h8kqr',
+    password: 'cwzPWMvQvuW2FLfzWWW4',
+    database: 'bkd9cyjknzoixcjzu6tx'
 });
 
-const userVotes = {};
+// Connect to the database
+db.connect(err => {
+    if (err) {
+        console.error('Database connection failed:', err.stack);
+        return;
+    }
+    console.log('Connected to database.');
+});
+
+// In-memory storage for votes (for simplicity)
+let votes = {
+    "Raymond I. ": 0,
+    "Florence U. ": 0,
+    "Jean Paul K. ": 0,
+    "Gaella U. ": 0,
+    "Danny H. ": 0
+};
+
+// In-memory storage for user data (for simplicity)
+let userNames = {};
+let voters = new Set(); // Set to track phone numbers that have already voted
+let userLanguages = {}; // Object to store the language preference of each user
 
 app.post('/ussd', (req, res) => {
-    const {
-        sessionId,
-        serviceCode,
-        phoneNumber,
-        text,
-    } = req.body;
-
     let response = '';
 
-    if (!userVotes[phoneNumber]) {
-        userVotes[phoneNumber] = {
-            voted: false,
-            language: null,
-            candidate: null,
-        };
-    }
+    // Extract USSD input
+    const { sessionId, serviceCode, phoneNumber, text } = req.body;
 
-    if (userVotes[phoneNumber].voted) {
-        response = 'END You have already voted. Thank you!';
-    } else {
-        if (text === '') {
-            response = `CON Please choose your language
-            1. KIN
-            2. ENG`;
-        } else if (text === '1') {
-            userVotes[phoneNumber].language = 'KIN';
-            response = `CON HITAMO UMUKANDIDA
-            1. PAUL KAGAME
-            2. FRANK HABINEZA
-            3. BARAFINDA`;
-        } else if (text === '2') {
-            userVotes[phoneNumber].language = 'ENG';
-            response = `CON Choose your candidate
-            1. PAUL KAGAME
-            2. FRANK HABINEZA
-            3. BARAFINDA`;
-        } else if (['1*1', '1*2', '1*3', '2*1', '2*2', '2*3'].includes(text)) {
-            const candidateID = text.split('*')[1];
-            userVotes[phoneNumber].candidate = candidateID;
+    // Parse user input
+    const userInput = text.split('*').map(option => option.trim());
 
-            let candidateName = '';
-            switch(candidateID) {
-                case '1':
-                    candidateName = 'PAUL KAGAME';
-                    break;
-                case '2':
-                    candidateName = 'FRANK HABINEZA';
-                    break;
-                case '3':
-                    candidateName = 'BARAFINDA';
-                    break;
-            }
+    // Determine next action based on user input
+    if (userInput.length === 1 && userInput[0] === '') {
+        // First level menu: Language selection
+        response = `CON Welcome to NIC  voting system\n`;
+        response += `1. English\n`;
+        response += `2. Swahili`;
+    } else if (userInput.length === 1 && userInput[0] !== '') {
+        // Save user's language choice and move to the name input menu
+        userLanguages[phoneNumber] = userInput[0] === '1' ? 'en' : 'sw';
+        response = userLanguages[phoneNumber] === 'en' ? 
+            `CON Please enter your name:` : 
+            `CON Tafadhali ingiza jina lako:`;
+    } else if (userInput.length === 2) {
+        // Save user's name
+        userNames[phoneNumber] = userInput[1];
 
-            response = userVotes[phoneNumber].language === 'KIN' ? 
-                `CON WAHISEMO ${candidateName}. EMEZA UGUKORA
-                1. Yego
-                2. Oya` : 
-                `CON You selected ${candidateName}. Confirm your vote
-                1. Yes
-                2. No`;
-        } else if (['1*1*1', '1*2*1', '1*3*1', '2*1*1', '2*2*1', '2*3*1'].includes(text)) {
-            userVotes[phoneNumber].voted = true;
-            response = userVotes[phoneNumber].language === 'KIN' ? 
-                'END WAHISEMO UMUKANDIDA. MURAKOZE!' : 
-                'END You have voted. Thank you!';
-        } else if (['1*1*2', '1*2*2', '1*3*2', '2*1*2', '2*2*2', '2*3*2'].includes(text)) {
-            response = userVotes[phoneNumber].language === 'KIN' ? 
-                'END MWABAYE MWANZE GUTORA. MURAKOZE!' : 
-                'END You have canceled your vote. Thank you!';
-        } else if (text.toLowerCase() === 'check') {
-            // Check voted candidates
-            const votedCandidate = userVotes[phoneNumber].candidate;
-            if (votedCandidate) {
-                let candidateName = '';
-                switch(votedCandidate) {
-                    case '1':
-                        candidateName = 'PAUL KAGAME';
-                        break;
-                    case '2':
-                        candidateName = 'FRANK HABINEZA';
-                        break;
-                    case '3':
-                        candidateName = 'BARAFINDA';
-                        break;
-                }
-                response = `END You have voted for ${candidateName}.`;
+        // Third level menu: Main menu
+        response = userLanguages[phoneNumber] === 'en' ? 
+            `CON Hi ${userNames[phoneNumber]}, choose an option:\n1. Vote Candidate\n2. View Votes` : 
+            `CON Habari ${userNames[phoneNumber]}, chagua chaguo:\n1. Piga kura\n2. Tazama kura`;
+    } else if (userInput.length === 3) {
+        if (userInput[2] === '1') {
+            // Check if the phone number has already voted
+            if (voters.has(phoneNumber)) {
+                response = userLanguages[phoneNumber] === 'en' ? 
+                    `END You have already voted. Thank you!` : 
+                    `END Tayari umeshapiga kura. Asante!`;
             } else {
-                response = 'END You have not voted yet.';
+                // Voting option selected
+                response = userLanguages[phoneNumber] === 'en' ? 
+                    `CON Select a candidate:\n1. Raymond IGABINEZA\n2. Florence UMUTONIWASE\n3. Jean Paul KWIBUKA\n4. Gaella UWAYO\n5. Danny HABIMANA` : 
+                    `CON Chagua mgombea:\n1. Raymond IGABINEZA\n2. Florence UMUTONIWASE\n3. Jean Paul KWIBUKA\n4. Gaella UWAYO\n5. Danny HABIMANA`;
             }
+        } else if (userInput[2] === '2') {
+            // View votes option selected
+            response = userLanguages[phoneNumber] === 'en' ? 
+                `END Votes:\n` : 
+                `END Kura:\n`;
+            for (let candidate in votes) {
+                response += `${candidate}: ${votes[candidate]} votes\n`;
+            }
+        }
+    } else if (userInput.length === 4) {
+        // Fourth level menu: Voting confirmation
+        let candidateIndex = parseInt(userInput[3]) - 1;
+        let candidateNames = Object.keys(votes);
+        if (candidateIndex >= 0 && candidateIndex < candidateNames.length) {
+            votes[candidateNames[candidateIndex]] += 1;
+            voters.add(phoneNumber); // Mark this phone number as having voted
+            response = userLanguages[phoneNumber] === 'en' ? 
+                `END Thank you for voting for ${candidateNames[candidateIndex]}!` : 
+                `END Asante kwa kumpigia kura ${candidateNames[candidateIndex]}!`;
+
+            // Insert voting record into the database
+            const voteData = {
+                session_id: sessionId,
+                phone_number: phoneNumber,
+                user_name: userNames[phoneNumber],
+                language_used: userLanguages[phoneNumber],
+                voted_candidate: candidateNames[candidateIndex]
+            };
+
+            const query = 'INSERT INTO votes SET ?';
+            db.query(query, voteData, (err, result) => {
+                if (err) {
+                    console.error('Error inserting data into database:', err.stack);
+                }
+            });
         } else {
-            response = userVotes[phoneNumber].language === 'KIN' ? 
-                'END IBYO WAHISEMO SIBYO. MWONGERE MUGERAGEZE.' : 
-                'END Invalid option. Please try again.';
+            response = userLanguages[phoneNumber] === 'en' ? 
+                `END Invalid selection. Please try again.` : 
+                `END Uchaguzi batili. Tafadhali jaribu tena.`;
         }
     }
 
-    res.set('Content-Type', 'text/plain');
     res.send(response);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
