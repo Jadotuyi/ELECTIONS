@@ -55,7 +55,7 @@ app.post('/ussd', (req, res) => {
         response += `2. Kinyarwanda`;
     } else if (userInput.length === 1 && userInput[0] !== '') {
         // Save user's language choice and move to the name input menu
-        userLanguages[phoneNumber] = userInput[0] === '1' ? 'en' : 'sw';
+        userLanguages[phoneNumber] = userInput[0] === '1' ? 'en' : 'kn';
         response = userLanguages[phoneNumber] === 'en' ? 
             `CON Please enter your name:` : 
             `CON Andika Izina Ryawe:`;
