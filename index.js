@@ -26,11 +26,11 @@ db.connect(err => {
 
 // In-memory storage for votes (for simplicity)
 let votes = {
-    "Raymond I. ": 0,
-    "Florence U. ": 0,
-    "Jean Paul K. ": 0,
-    "Gaella U. ": 0,
-    "Danny H. ": 0
+    "Paul KAGAME ": 0,
+    "Frank HABINEZA ": 0,
+    "Jean MBANDA ": 0,
+    "Sekikubo BARAFINDA ": 0,
+    "Daniel HAKIZIMANA ": 0
 };
 
 // In-memory storage for user data (for simplicity)
@@ -66,7 +66,7 @@ app.post('/ussd', (req, res) => {
         // Third level menu: Main menu
         response = userLanguages[phoneNumber] === 'en' ? 
             `CON Hi ${userNames[phoneNumber]}, choose an option:\n1. Vote Candidate\n2. View Votes` : 
-            `CON Habari ${userNames[phoneNumber]}, chagua chaguo:\n1. Tora Umukandida\n2. Reba Amajwi`;
+            `CON Muraho ${userNames[phoneNumber]}, Hitamo:\n1. Tora Umukandida\n2. Reba Amajwi`;
     } else if (userInput.length === 3) {
         if (userInput[2] === '1') {
             // Check if the phone number has already voted
